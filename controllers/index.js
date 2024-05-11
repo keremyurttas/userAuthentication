@@ -1,4 +1,5 @@
 import User from "../models/userSchema.js";
+import bcrypt from "bcrypt";
 export const registerController = async (req, res, next) => {
   const { username, password, role } = req.body;
 
@@ -12,17 +13,20 @@ export const registerController = async (req, res, next) => {
         message: "Password less than 6 characters",
       });
     }
+
     const isUsernameExist = await User.findOne({ username });
     if (isUsernameExist) {
       return res.status(409).json({
         message: "Username already exists",
       });
     }
-    User.create({ username, password, role }).then((user) =>
-      res.status(200).json({
-        user,
-      })
-    );
+    bcrypt.hash(password, 10).then(async (hash) => {
+      User.create({ username, password: hash, role }).then((user) =>
+        res.status(200).json({
+          user,
+        })
+      );
+    });
   } catch (err) {
     res.status(401).json({
       message: "User not successful created",
@@ -34,13 +38,17 @@ export const registerController = async (req, res, next) => {
 export const loginController = async (req, res) => {
   try {
     const { username, password } = req.body;
-    const user = await User.findOne({ username, password });
+    const user = await User.findOne({ username });
     if (!user) {
       res
         .status(401)
         .json({ message: "Login not succesful", error: "User not found" });
     } else {
-      res.status(200).json({ message: "succesfully logged in." });
+      bcrypt.compare(password, user.password).then((result) => {
+        result
+          ? res.status(200).json({ message: "succesfully logged in." })
+          : res.status(400).json({ message: "False password" });
+      });
     }
   } catch (error) {
     res.status(400).json({
